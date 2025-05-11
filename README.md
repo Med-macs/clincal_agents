@@ -15,6 +15,8 @@ Install langgraph and the packages used
 pip install -qU 'langgraph==0.3.21' 'langchain-google-genai==2.1.2' 'langgraph-prebuilt==0.1.7'
 ```
 
+Run Fast API server
+
 ```
 uvicorn app.main:app --reload
 ```
