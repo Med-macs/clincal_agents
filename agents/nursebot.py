@@ -15,10 +15,6 @@ def take_note(text: str) -> str:
     """Add this symptom description to your notes if it seems medically relevant."""
     return text
 
-# @tool
-# def end_chat():
-#     """Call this when the patient wants to end the conversation or when sufficient information is gathered."""
-#     return True
 
 llm_with_tools = llm.bind_tools([take_note])
 
@@ -56,8 +52,6 @@ def chatbot_node(state: SymptomState) -> SymptomState:
     else:
         response = AIMessage(content=WELCOME_MSG)
 
-    print("LLM Response: ", response)
-
     new_notes = state.get("notes", [])
     finished = state.get("finished", False)
 
@@ -67,8 +61,6 @@ def chatbot_node(state: SymptomState) -> SymptomState:
                 new_notes.append(call["args"]["text"])
                 finished = True
             
-            # if call["name"] == "end_chat":
-            #     finished = True
 
     return {
         **state,
@@ -90,8 +82,8 @@ graph_builder.add_edge(START, "chatbot")
 graph_builder.add_edge("human", "chatbot")
 
 
-def maybe_exit_human_node(state: SymptomState):
-    return END if state.get("finished", False) else "chatbot"
+# def maybe_exit_human_node(state: SymptomState):
+#     return END if state.get("finished", False) else "chatbot"
 
 def maybe_exit_chatbot_node(state: SymptomState):
     return END if state.get("finished", False) else "human"
