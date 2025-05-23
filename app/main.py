@@ -162,8 +162,23 @@ class ChatResponse(BaseModel):
     finished: bool
     notes: Optional[List[str]] = None
 
+# Prompt Injection Guard
+def is_prompt_injection(input_text: str) -> bool:
+    suspicious_phrases = [
+        r"ignore\s+(all|previous|above)\s+instructions",
+        r"disregard\s+(this|that|everything)",
+        r"forget\s+.*\bprevious\b",
+        r"act\s+as\s+.*",
+        r"(system|you)\s+are\s+now",
+        r"you\s+are\s+no\s+longer\s+an\s+AI"
+    ]
+    input_text_lower = input_text.lower()
+    for pattern in suspicious_phrases:
+        if re.search(pattern, input_text_lower):
+            return True
+    return False
+
 def create_table():
-    """Create the patient_assessments table if it doesn't exist"""
     conn = None
     cur = None
     try:
@@ -175,7 +190,6 @@ def create_table():
             port=port_id
         )
         cur = conn.cursor()
-        
         create_script = '''
         CREATE TABLE IF NOT EXISTS patient_assessments(
             assessment_id SERIAL PRIMARY KEY,
@@ -184,11 +198,9 @@ def create_table():
             diagnosis TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )'''
-        
         cur.execute(create_script)
         conn.commit()
         logger.info("Table patient_assessments created successfully or already exists")
-        
     except Exception as error:
         logger.error(f"Error creating table: {error}")
     finally:
@@ -210,29 +222,20 @@ def insert_assessment(notes: str, esi_level: int, diagnosis: str):
             port=port_id
         )
         logger.info("Database connection successful")
-        
         cur = conn.cursor()
-        
         insert_script = '''
         INSERT INTO patient_assessments (patient_notes, esi_level, diagnosis) 
         VALUES (%s, %s, %s)
         RETURNING assessment_id;
         '''
         insert_value = (notes, esi_level, diagnosis)
-        
-        logger.info(f"Attempting to insert assessment with values: {insert_value}")
         cur.execute(insert_script, insert_value)
         inserted_id = cur.fetchone()[0]
         conn.commit()
-        logger.info(f"Successfully inserted assessment with ID: {inserted_id}")
-        
-        # Verify the insertion
         cur.execute("SELECT * FROM patient_assessments WHERE assessment_id = %s", (inserted_id,))
         verification = cur.fetchone()
         logger.info(f"Verification of inserted assessment: {verification}")
-        
         return inserted_id
-        
     except Exception as error:
         logger.error(f"Database error during insert: {error}")
         if conn:
@@ -246,31 +249,22 @@ def insert_assessment(notes: str, esi_level: int, diagnosis: str):
             logger.info("Database connection closed")
 
 def extract_esi_level(esi_str: str) -> int:
-    """Extract ESI level from string and convert to integer"""
     try:
-        # First try to find a number after "ESI" or "Level"
         match = re.search(r'ESI\s*(\d+)|Level\s*(\d+)', esi_str, re.IGNORECASE)
         if match:
-            # Return the first non-None group
             number = next(num for num in match.groups() if num is not None)
             return int(number)
-        
-        # If that fails, try to find any number
         match = re.search(r'\d+', esi_str)
         if match:
             return int(match.group())
-        
-        # If no number found, return default
         logger.warning(f"Could not extract ESI level from '{esi_str}', using default value 3")
         return 3
-        
     except Exception as e:
         logger.error(f"Error extracting ESI level from '{esi_str}': {e}")
         return 3
 
 @app.on_event("startup")
 async def startup_event():
-    """Create table on startup"""
     create_table()
 
 @app.get("/")
@@ -279,7 +273,6 @@ def root():
 
 @app.post("/test-insert")
 def test_insert():
-    """Test endpoint to verify database operations"""
     try:
         assessment_id = insert_assessment(
             notes="Test patient with fever",
@@ -296,7 +289,6 @@ def test_insert():
 
 @app.get("/view-assessments")
 def view_assessments():
-    """Endpoint to view all assessments"""
     conn = None
     cur = None
     try:
@@ -308,11 +300,8 @@ def view_assessments():
             port=port_id
         )
         cur = conn.cursor()
-        
         cur.execute("SELECT * FROM patient_assessments ORDER BY created_at DESC")
         records = cur.fetchall()
-        
-        # Convert records to a list of dictionaries
         assessments = []
         for record in records:
             assessments.append({
@@ -322,9 +311,7 @@ def view_assessments():
                 "diagnosis": record[3],
                 "created_at": record[4].strftime("%Y-%m-%d %H:%M:%S")
             })
-            
         return {"assessments": assessments}
-    
     except Exception as error:
         logger.error(f"Error fetching assessments: {error}")
         return {"error": str(error)}
@@ -337,46 +324,43 @@ def view_assessments():
 @app.post("/triage", response_model=TriageResponse)
 def triage_endpoint(data: TriageRequest):
     logger.info(f"Received triage request with note: {data.note}")
-    
+    if is_prompt_injection(data.note):
+        logger.warning("Potential prompt injection detected in triage note")
+        return TriageResponse(esi="N/A", diagnosis="Prompt injection detected", iterations=0)
     try:
         result = run_triage_workflow(data.note)
         logger.info(f"Triage workflow result: {result}")
-        
-        # Extract ESI level from result
         esi_level = extract_esi_level(result['esi'])
-        
-        logger.info("Attempting to insert assessment...")
         assessment_id = insert_assessment(
             notes=data.note,
             esi_level=esi_level,
             diagnosis=result['diagnosis']
         )
         logger.info(f"Assessment stored successfully with ID: {assessment_id}")
-        
     except Exception as e:
         logger.error(f"Error in triage endpoint: {e}")
         raise
-    
     return TriageResponse(**result)
 
 @app.post("/chat-to-triage", response_model=ChatResponse)
 def chat_to_triage(data: ChatRequest):
     if not data.history:
-        return ChatResponse(
-            response=WELCOME_MSG,
-            finished=False,
-            notes=[]
-        )
-    
+        return ChatResponse(response=WELCOME_MSG, finished=False, notes=[])
+    for msg in data.history:
+        if is_prompt_injection(msg["content"]):
+            logger.warning("Prompt injection detected in chat history")
+            return ChatResponse(
+                response="⚠️ Potential prompt injection detected. Conversation terminated for safety.",
+                finished=True,
+                notes=[]
+            )
     messages = [SystemMessage(content=NURSEBOT_SYSINT[1])]
     for msg in data.history:
         if msg["role"] == "user":
             messages.append(HumanMessage(content=msg["content"]))
         elif msg["role"] == "assistant":
             messages.append(AIMessage(content=msg["content"]))
-    
     response = llm_with_tools.invoke(messages)
-    
     notes = []
     finished = False
     if hasattr(response, "tool_calls") and response.tool_calls:
@@ -384,24 +368,25 @@ def chat_to_triage(data: ChatRequest):
             if call["name"] == "take_note" and "text" in call["args"]:
                 notes.append(call["args"]["text"])
                 finished = True
-    
     if finished:
         combined_note = "\n".join(notes)
+        if is_prompt_injection(combined_note):
+            logger.warning("Prompt injection detected in generated notes")
+            return ChatResponse(
+                response="⚠️ Unsafe content detected in final notes. Assessment aborted.",
+                finished=True,
+                notes=notes
+            )
         triage_result = run_triage_workflow(combined_note)
         logger.info(f"Full triage result: {triage_result}")
-        
         try:
-            # Extract ESI level from triage result
             esi_level = extract_esi_level(triage_result['esi'])
-            logger.info(f"Extracted ESI level: {esi_level}")
-            
             assessment_id = insert_assessment(
                 notes=combined_note,
                 esi_level=esi_level,
                 diagnosis=triage_result['diagnosis']
             )
             logger.info(f"Chat assessment stored successfully with ID: {assessment_id}")
-            
             return ChatResponse(
                 response=f"Triage Assessment Complete!\nESI Level: {esi_level}\nDiagnosis: {triage_result['diagnosis']}\nAssessment ID: {assessment_id}",
                 finished=True,
@@ -409,22 +394,15 @@ def chat_to_triage(data: ChatRequest):
             )
         except Exception as e:
             logger.error(f"Failed to store chat assessment: {e}")
-            logger.error(f"Triage result: {triage_result}")
             return ChatResponse(
                 response=f"Triage Assessment Complete!\nESI Level: {triage_result['esi']}\nDiagnosis: {triage_result['diagnosis']}\nNote: Failed to store assessment",
                 finished=True,
                 notes=notes
             )
-    
-    return ChatResponse(
-        response=response.content,
-        finished=finished,
-        notes=notes
-    )
+    return ChatResponse(response=response.content, finished=finished, notes=notes)
 
 @app.delete("/clear-assessments")
 def clear_assessments():
-    """Delete all assessments from the database"""
     conn = None
     cur = None
     try:
@@ -436,11 +414,9 @@ def clear_assessments():
             port=port_id
         )
         cur = conn.cursor()
-        
         cur.execute("TRUNCATE TABLE patient_assessments RESTART IDENTITY")
         conn.commit()
         return {"message": "All assessments cleared successfully"}
-    
     except Exception as error:
         logger.error(f"Error clearing assessments: {error}")
         return {"error": str(error)}
