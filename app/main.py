@@ -76,10 +76,10 @@
 #     # Initialize state if this is the first message
 #     if not data.history:
 #         return ChatResponse(
-#             response=WELCOME_MSG,
-#             finished=False,
-#             notes=[]
-#         )
+# #             response=WELCOME_MSG,
+# #             finished=False,
+# #             notes=[]
+# #         )
     
 #     # Convert history to the format expected by the LLM
 #     messages = [SystemMessage(content=NURSEBOT_SYSINT[1])]
@@ -263,8 +263,35 @@ def extract_esi_level(esi_str: str) -> int:
         logger.error(f"Error extracting ESI level from '{esi_str}': {e}")
         return 3
 
+def create_database_if_not_exists():
+    import psycopg2
+    from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+    try:
+        conn = psycopg2.connect(
+            host=hostname,
+            dbname='postgres',  # Connect to default db
+            user=username,
+            password=pwd,
+            port=port_id
+        )
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (database,))
+        exists = cur.fetchone()
+        if not exists:
+            cur.execute(f'CREATE DATABASE "{database}"')
+            logger.info(f"Database '{database}' created successfully.")
+        else:
+            logger.info(f"Database '{database}' already exists.")
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Error creating database: {e}")
+
+# Call this before create_table()
 @app.on_event("startup")
 async def startup_event():
+    create_database_if_not_exists()
     create_table()
 
 @app.get("/")
