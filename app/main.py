@@ -138,7 +138,7 @@ logger = logging.getLogger(__name__)
 
 # Database configuration
 hostname = 'localhost'
-database = 'triage' #Put your database name here 
+database = 'triage' 
 username = 'postgres'
 pwd = ' ' #Add password here
 port_id = 5432
@@ -156,6 +156,8 @@ class TriageResponse(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: List[Dict[str, str]]
+    patient_name: str
+    patient_email: str
 
 class ChatResponse(BaseModel):
     response: str
@@ -193,6 +195,8 @@ def create_table():
         create_script = '''
         CREATE TABLE IF NOT EXISTS patient_assessments(
             assessment_id SERIAL PRIMARY KEY,
+            patient_name TEXT NOT NULL,
+            patient_email TEXT NOT NULL,
             patient_notes TEXT NOT NULL,
             esi_level INTEGER NOT NULL,
             diagnosis TEXT NOT NULL,
@@ -209,7 +213,7 @@ def create_table():
         if conn is not None:
             conn.close()
 
-def insert_assessment(notes: str, esi_level: int, diagnosis: str):
+def insert_assessment(notes: str, esi_level: int, diagnosis: str, patient_name: str, patient_email: str):
     conn = None
     cur = None
     try:
@@ -224,11 +228,11 @@ def insert_assessment(notes: str, esi_level: int, diagnosis: str):
         logger.info("Database connection successful")
         cur = conn.cursor()
         insert_script = '''
-        INSERT INTO patient_assessments (patient_notes, esi_level, diagnosis) 
-        VALUES (%s, %s, %s)
+        INSERT INTO patient_assessments (patient_notes, esi_level, diagnosis, patient_name, patient_email) 
+        VALUES (%s, %s, %s, %s, %s)
         RETURNING assessment_id;
         '''
-        insert_value = (notes, esi_level, diagnosis)
+        insert_value = (notes, esi_level, diagnosis, patient_name, patient_email)
         cur.execute(insert_script, insert_value)
         inserted_id = cur.fetchone()[0]
         conn.commit()
@@ -302,6 +306,8 @@ def root():
 def test_insert():
     try:
         assessment_id = insert_assessment(
+            patient_name="John Doe",
+            patient_email="john.doe@example.com",
             notes="Test patient with fever",
             esi_level=3,
             diagnosis="Fever of unknown origin"
@@ -331,12 +337,15 @@ def view_assessments():
         records = cur.fetchall()
         assessments = []
         for record in records:
+            print(record)   
             assessments.append({
                 "assessment_id": record[0],
-                "patient_notes": record[1],
-                "esi_level": record[2],
-                "diagnosis": record[3],
-                "created_at": record[4].strftime("%Y-%m-%d %H:%M:%S")
+                "patient_name": record[1],
+                "patient_email": record[2],
+                "patient_notes": record[3],
+                "esi_level": record[4],
+                "diagnosis": record[5],
+                "created_at": record[6]
             })
         return {"assessments": assessments}
     except Exception as error:
@@ -358,12 +367,12 @@ def triage_endpoint(data: TriageRequest):
         result = run_triage_workflow(data.note)
         logger.info(f"Triage workflow result: {result}")
         esi_level = extract_esi_level(result['esi'])
-        assessment_id = insert_assessment(
-            notes=data.note,
-            esi_level=esi_level,
-            diagnosis=result['diagnosis']
-        )
-        logger.info(f"Assessment stored successfully with ID: {assessment_id}")
+        # assessment_id = insert_assessment(
+        #     notes=data.note,
+        #     esi_level=esi_level,
+        #     diagnosis=result['diagnosis']
+        # )
+        # logger.info(f"Assessment stored successfully with ID: {assessment_id}")
     except Exception as e:
         logger.error(f"Error in triage endpoint: {e}")
         raise
@@ -409,6 +418,8 @@ def chat_to_triage(data: ChatRequest):
         try:
             esi_level = extract_esi_level(triage_result['esi'])
             assessment_id = insert_assessment(
+                patient_name=data.patient_name,
+                patient_email=data.patient_email,
                 notes=combined_note,
                 esi_level=esi_level,
                 diagnosis=triage_result['diagnosis']
