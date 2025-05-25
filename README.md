@@ -54,29 +54,6 @@ chmod +x cli.sh
 | `./cli.sh env` | Set up environment variables |
 | `./cli.sh clean` | Remove virtual environment and cached files |
 
-### Manual Setup
-
-1. Create and activate virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements_new.txt
-```
-
-3. Run FastAPI server:
-```bash
-uvicorn app.main:app --reload
-```
-
-4. Run Streamlit UI:
-```bash
-streamlit run app/streamlit_app.py
-```
-
 ## Deployment
 
 ### Google Cloud Run Setup
