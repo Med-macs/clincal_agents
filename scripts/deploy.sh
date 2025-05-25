@@ -7,50 +7,42 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-PROJECT_ID="gen-lang-client-0408541483" 
-REGION="us-central1"
-SERVICE_NAME="triage-api" 
-IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
+PROJECT_ID=$(gcloud config get-value project)
+REGION="us-central1"  # Default region
+SERVICE_NAME="clinical-agents"
+IMAGE_NAME="clinical-agents"
 
-echo -e "${BLUE}🚀 Deploying Clinical Agents to Google Cloud Run...${NC}"
+echo -e "${BLUE}🚀 Deploying $SERVICE_NAME to Google Cloud Run...${NC}"
 
-# Check if gcloud is installed
-if ! command -v gcloud &> /dev/null; then
-    echo -e "${RED}❌ Google Cloud SDK (gcloud) is not installed. Please install it first.${NC}"
-    exit 1
-fi
+# Build the Docker image
+echo -e "${BLUE}📦 Building Docker image...${NC}"
+docker build -t "$IMAGE_NAME" .
 
-# Check if user is authenticated
-if ! gcloud auth print-identity-token &> /dev/null; then
-    echo -e "${YELLOW}⚠️  Not authenticated with Google Cloud. Please authenticate:${NC}"
-    gcloud auth login
-fi
+# Tag the image for Google Container Registry
+echo -e "${BLUE}🏷️  Tagging image for GCR...${NC}"
+docker tag "$IMAGE_NAME" "gcr.io/$PROJECT_ID/$IMAGE_NAME"
 
-# Set the project
-echo -e "${BLUE}📍 Setting Google Cloud project...${NC}"
-gcloud config set project ${PROJECT_ID}
-
-# Build the container image
-echo -e "${BLUE}🏗️  Building container image...${NC}"
-gcloud builds submit --tag ${IMAGE_NAME}
+# Push the image to Google Container Registry
+echo -e "${BLUE}⬆️  Pushing image to GCR...${NC}"
+docker push "gcr.io/$PROJECT_ID/$IMAGE_NAME"
 
 # Deploy to Cloud Run
 echo -e "${BLUE}🚀 Deploying to Cloud Run...${NC}"
-gcloud run deploy ${SERVICE_NAME} \
-    --image ${IMAGE_NAME} \
-    --platform managed \
-    --region ${REGION} \
-    --allow-unauthenticated \
-    --port 8000 \
-    --set-env-vars="ENVIRONMENT=production"
+gcloud run deploy "$SERVICE_NAME" \
+  --image "gcr.io/$PROJECT_ID/$IMAGE_NAME" \
+  --platform managed \
+  --region "$REGION" \
+  --allow-unauthenticated \
+  --set-env-vars "ENVIRONMENT=production" \
+  --memory 2Gi \
+  --cpu 2 \
+  --min-instances 1
 
 # Get the service URL
-SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region ${REGION} --format='value(status.url)')
+SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --region "$REGION" --format 'value(status.url)')
 
 echo -e "${GREEN}✅ Deployment complete!${NC}"
-echo -e "${BLUE}🌐 Service URL: ${SERVICE_URL}${NC}"
-echo -e "${YELLOW}ℹ️  Note: Make sure to set up your environment variables in the Google Cloud Console${NC}" 
+echo -e "${BLUE}🌎 Service URL: ${NC}$SERVICE_URL" 

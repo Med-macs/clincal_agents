@@ -194,9 +194,12 @@ install() {
     echo -e "${BLUE}⬆️  Upgrading pip...${NC}"
     pip install --upgrade pip
 
+    # Remove conflicting packages
+    pip uninstall -qqy kfp jupyterlab libpysal thinc spacy fastai ydata-profiling google-cloud-bigquery google-generativeai
+
     # Install Python packages
     echo -e "${BLUE}📚 Installing Python dependencies...${NC}"
-    pip install -r requirements_new.txt
+    pip install -r requirements.txt
 
     # Setup environment variables
     check_env
