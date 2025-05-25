@@ -112,7 +112,8 @@ networkx==3.4.2
 nltk==3.9.1
 noisereduce==3.0.3
 numba==0.61.0
-numpy==1.26.4
+numpy==1.26.4; platform_machine != 'arm64'
+numpy==1.26.4; platform_machine == 'arm64' --index-url https://pypi.anaconda.org/scipy-wheels-nightly/simple
 omegaconf==1.4.1
 openai==1.65.3
 openpyxl==3.1.2
