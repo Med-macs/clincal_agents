@@ -1,25 +1,14 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
 from agents.triageagent import run_triage_workflow
 from agents.nursebot import NURSEBOT_SYSINT, WELCOME_MSG, llm_with_tools
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-import logging
-from app.engine import SessionDep, create_tables
-from contextlib import asynccontextmanager
+from app.engine import SupabaseDep
 from app.routers.AssessmentRouter import AssessmentRouter
 from app.routers.TriageRouter import TriageRouter
 from fastapi.middleware.cors import CORSMiddleware
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    create_tables()
-    yield
-    # Shutdown
-    pass
-
 app = FastAPI(
     title="AI Triage API",
-    lifespan=lifespan,
     ignore_trailing_slash=True
 )
 

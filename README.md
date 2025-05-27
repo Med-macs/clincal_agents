@@ -43,16 +43,10 @@ chmod +x cli.sh
 |---------|-------------|
 | `./cli.sh help` | Show help message |
 | `./cli.sh install` | Install dependencies and set up virtual environment |
-| `./cli.sh start-all` | Start both UI and API server in parallel |
 | `./cli.sh start-ui` | Start only the Streamlit UI |
 | `./cli.sh start-server` | Start only the FastAPI server |
-| `./cli.sh stop` | Stop all running services |
-| `./cli.sh status` | Check status of running services |
-| `./cli.sh db` | Start PostgreSQL database service |
-| `./cli.sh db:stop` | Stop PostgreSQL database service |
-| `./cli.sh db:create` | Create the database |
-| `./cli.sh env` | Set up environment variables |
 | `./cli.sh clean` | Remove virtual environment and cached files |
+| `./cli.sh test-api` | Test API endpoints with sample data |
 
 ## Deployment
 
@@ -78,7 +72,14 @@ chmod +x scripts/deploy.sh
 
 4. Deploy to Cloud Run:
 ```bash
-./scripts/deploy.sh
+# Deploy with all stages (check, build, push, deploy)
+./scripts/deploy.sh all
+
+# Or run individual stages:
+./scripts/deploy.sh check   # Run pre-deployment checks only
+./scripts/deploy.sh build   # Build and tag Docker image
+./scripts/deploy.sh push    # Push image to Google Container Registry
+./scripts/deploy.sh deploy  # Deploy to Cloud Run
 ```
 
 The deployment script will:
@@ -105,6 +106,38 @@ ENVIRONMENT=production
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+## Supabase Setup
+
+This project uses Supabase as the database backend. You can either use a hosted Supabase instance or run it locally.
+
+### Option 1: Local Supabase (Recommended for Development)
+
+1. Install Supabase CLI:
+
+   ```bash
+   brew install supabase/tap/supabase
+   ```
+
+2. Start local Supabase services:
+
+   ```bash
+   supabase start
+   ```
+
+3. Access the local Supabase dashboard at http://localhost:54323
+
+### Option 2: Hosted Supabase
+
+1. Create a Supabase project at [https://supabase.com](https://supabase.com)
+
+2. Get your project URL and API key from the project settings
+
+3. Update your `.env` file with the Supabase credentials:
+
+   ```
+   SUPABASE_URL=your_project_url
+   SUPABASE_KEY=your_api_key
+   ```
 
 ## License
 

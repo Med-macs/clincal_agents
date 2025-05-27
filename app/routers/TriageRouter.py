@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app.models import TriageRequest, TriageResponse, ChatRequest, ChatResponse
-from app.engine import SessionDep
+from app.engine import SupabaseDep
 from agents.triageagent import run_triage_workflow
 from agents.nursebot import NURSEBOT_SYSINT, WELCOME_MSG, llm_with_tools
 from app.repository.AssessmentRepository import AssessmentRepository
@@ -43,7 +43,7 @@ def extract_esi_level(esi_str: str) -> int:
 
 
 @TriageRouter.post("/", response_model=TriageResponse)
-def triage_endpoint(data: TriageRequest, session: SessionDep):
+def triage_endpoint(data: TriageRequest, session: SupabaseDep):
     logger.info(f"Received triage request with note: {data.note}")
     if is_prompt_injection(data.note):
         logger.warning("Potential prompt injection detected in triage note")
@@ -65,7 +65,7 @@ def triage_endpoint(data: TriageRequest, session: SessionDep):
     return TriageResponse(**result)
 
 @TriageRouter.post("/chat", response_model=ChatResponse)
-def chat_to_triage(data: ChatRequest, session: SessionDep):
+def chat_to_triage(data: ChatRequest, session: SupabaseDep):
     if not data.history:
         return ChatResponse(response=WELCOME_MSG, finished=False, notes=[])
     for msg in data.history:

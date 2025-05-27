@@ -1,8 +1,6 @@
 from pydantic import BaseModel
-from sqlmodel import SQLModel, Field
-from datetime import datetime, UTC
+from datetime import datetime
 from typing import List, Dict, Optional
-from sqlalchemy import DateTime
 
 class ChatRequest(BaseModel):
     message: str
@@ -23,12 +21,20 @@ class TriageResponse(BaseModel):
     diagnosis: str
     iterations: int
 
-class PatientAssessment(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+class PatientAssessment(BaseModel):
+    id: Optional[int] = None
     notes: str
     esi_level: int
     diagnosis: str
-    created_at: datetime = Field(
-        sa_type=DateTime(),
-        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
-    )
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    def model_dump(self, **kwargs):
+        data = super().model_dump(**kwargs)
+        # Remove None values to let database defaults handle them
+        return {k: v for k, v in data.items() if v is not None and k != 'id'}
+
+    class Config:
+        json_encoders = {
+            datetime: lambda dt: dt.isoformat()
+        }
