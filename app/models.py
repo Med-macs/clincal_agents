@@ -7,6 +7,8 @@ from sqlalchemy import DateTime
 class ChatRequest(BaseModel):
     message: str
     history: List[Dict[str, str]]
+    patient_name: str
+    patient_email: str
 
 class ChatResponse(BaseModel):
     response: str
