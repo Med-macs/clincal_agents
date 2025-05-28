@@ -5,6 +5,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.engine import SupabaseDep
 from app.routers.AssessmentRouter import AssessmentRouter
 from app.routers.TriageRouter import TriageRouter
+from app.routers.UserRouter import UserRouter
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
@@ -24,6 +25,7 @@ app.add_middleware(
 # Routers
 app.include_router(AssessmentRouter, prefix="/api/v1")
 app.include_router(TriageRouter, prefix="/api/v1")
+app.include_router(UserRouter, prefix="/api/v1")
 
 @app.get("/")
 def root():

@@ -124,7 +124,7 @@ deploy_service() {
         --memory 2Gi \
         --cpu 2 \
         --min-instances 1 \
-        --port 8000
+        --port 8080
 
     # Get the service URL
     SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --region "$REGION" --format 'value(status.url)')

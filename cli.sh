@@ -28,6 +28,8 @@ print_help() {
     echo "  db:create   - Create the database"
     echo "  env         - Set up environment variables"
     echo "  clean       - Remove virtual environment and cached files"
+    echo "  test-api    - Test assessment API endpoints"
+    echo "  test-users  - Test users API endpoints"
     echo "  help        - Show this help message"
 }
 
@@ -122,6 +124,68 @@ test_api() {
     echo -e "\n${GREEN}✅ API tests complete!${NC}"
 }
 
+# Test Users API endpoints
+test_users_api() {
+    echo -e "${BLUE}🧪 Testing Users API endpoints...${NC}"
+    local API_URL="http://localhost:8000/api/v1"
+
+    # Create/Login a patient user
+    echo -e "\n👤 Creating/Login patient user..."
+    PATIENT_RESPONSE=$(curl -s -X POST "${API_URL}/users/login" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "John Doe",
+            "email": "john.doe@example.com",
+            "age": 30,
+            "gender": "male",
+            "user_type": "patient"
+        }')
+    
+    echo "$PATIENT_RESPONSE"
+    PATIENT_ID=$(echo "$PATIENT_RESPONSE" | jq -r '.id')
+
+    # Create/Login a staff user
+    echo -e "\n👩‍⚕️ Creating/Login staff user..."
+    STAFF_RESPONSE=$(curl -s -X POST "${API_URL}/users/login" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "Dr. Jane Smith",
+            "email": "jane.smith@hospital.com",
+            "age": 35,
+            "gender": "female",
+            "user_type": "staff"
+        }')
+    
+    echo "$STAFF_RESPONSE"
+    STAFF_ID=$(echo "$STAFF_RESPONSE" | jq -r '.id')
+
+    # Get patient user by ID
+    echo -e "\n📋 Getting patient user by ID ($PATIENT_ID)..."
+    curl -s -X GET "${API_URL}/users/${PATIENT_ID}" | jq
+
+    # Get staff user by ID
+    echo -e "\n📋 Getting staff user by ID ($STAFF_ID)..."
+    curl -s -X GET "${API_URL}/users/${STAFF_ID}" | jq
+
+    # Test getting non-existent user
+    echo -e "\n❌ Testing non-existent user (should return 404)..."
+    curl -s -X GET "${API_URL}/users/99999" || echo "Expected 404 error"
+
+    # Test duplicate login (should return existing user)
+    echo -e "\n🔄 Testing duplicate login (should return existing patient)..."
+    curl -s -X POST "${API_URL}/users/login" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "John Doe",
+            "email": "john.doe@example.com",
+            "age": 30,
+            "gender": "male",
+            "user_type": "patient"
+        }' | jq
+
+    echo -e "\n${GREEN}✅ Users API tests complete!${NC}"
+}
+
 # Main command router
 case "$1" in
     "install")
@@ -141,6 +205,9 @@ case "$1" in
         ;;
     "test-api")
         test_api
+        ;;
+    "test-users")
+        test_users_api
         ;;
     *)
         echo -e "${RED}❌ Unknown command: $1${NC}"
