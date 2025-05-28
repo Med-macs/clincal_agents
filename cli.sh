@@ -92,34 +92,47 @@ clean() {
 test_api() {
     echo -e "${BLUE}🧪 Testing API endpoints...${NC}"
     local API_URL="http://localhost:8000/api/v1"
+    local USER_ID=4
 
-    # Create a test assessment
+    # Create a test assessment with user_id=4
     echo -e "\n📝 Creating test assessment..."
-    curl -X POST "${API_URL}/assessments" \
+    ASSESSMENT_RESPONSE=$(curl -s -X POST "${API_URL}/assessments" \
         -H "Content-Type: application/json" \
-        -d '{
-            "notes": "Patient presents with severe headache",
-            "esi_level": 2,
-            "diagnosis": "Migraine"
-        }'
+        -d "{
+            \"notes\": \"Patient presents with severe headache\",
+            \"esi_level\": 2,
+            \"diagnosis\": \"Migraine\",
+            \"user_id\": ${USER_ID}
+        }")
+    
+    echo "$ASSESSMENT_RESPONSE"
+    ASSESSMENT_ID=$(echo "$ASSESSMENT_RESPONSE" | jq -r '.id')
 
     # Get all assessments
     echo -e "\n📋 Getting all assessments..."
-    curl -X GET "${API_URL}/assessments"
+    curl -s -X GET "${API_URL}/assessments" | jq
 
-    # Delete all assessments
-    echo -e "\n🗑️  Deleting assessment..."
-    # Extract the ID from the create response
-    ASSESSMENT_ID=$(curl -X POST "${API_URL}/assessments" \
+    # Create another test assessment
+    echo -e "\n📝 Creating another test assessment..."
+    ASSESSMENT_RESPONSE_2=$(curl -s -X POST "${API_URL}/assessments" \
         -H "Content-Type: application/json" \
-        -d '{
-            "notes": "Patient presents with severe headache",
-            "esi_level": 2,
-            "diagnosis": "Migraine"
-        }' | jq -r '.id')
+        -d "{
+            \"notes\": \"Patient has chest pain and shortness of breath\",
+            \"esi_level\": 1,
+            \"diagnosis\": \"Possible MI\",
+            \"user_id\": ${USER_ID}
+        }")
     
-    # Delete using the extracted ID
-    curl -X DELETE "${API_URL}/assessments/${ASSESSMENT_ID}"
+    echo "$ASSESSMENT_RESPONSE_2"
+    ASSESSMENT_ID_2=$(echo "$ASSESSMENT_RESPONSE_2" | jq -r '.id')
+
+    # Delete the first assessment
+    echo -e "\n🗑️  Deleting assessment ${ASSESSMENT_ID}..."
+    curl -s -X DELETE "${API_URL}/assessments/${ASSESSMENT_ID}"
+
+    # Verify deletion by getting all assessments again
+    echo -e "\n📋 Getting all assessments after deletion..."
+    curl -s -X GET "${API_URL}/assessments" | jq
 
     echo -e "\n${GREEN}✅ API tests complete!${NC}"
 }

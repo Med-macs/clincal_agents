@@ -7,11 +7,12 @@ class AssessmentRepository:
     def __init__(self, session: SupabaseDep):
         self.session = session
 
-    def create(self, notes: str, esi_level: int, diagnosis: str) -> PatientAssessment:
+    def create(self, notes: str, esi_level: int, diagnosis: str, user_id: int) -> PatientAssessment:
         assessment = PatientAssessment(
             notes=notes,
             esi_level=esi_level,
-            diagnosis=diagnosis
+            diagnosis=diagnosis,
+            user_id=user_id
         )
         response = self.session.table("assessments").insert(assessment.model_dump()).execute()
         return PatientAssessment(**response.data[0])

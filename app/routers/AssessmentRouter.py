@@ -16,7 +16,8 @@ def create_assessment(assessment: PatientAssessment, session: SupabaseDep):
     return assessment_repository.create(
         notes=assessment.notes,
         esi_level=assessment.esi_level,
-        diagnosis=assessment.diagnosis
+        diagnosis=assessment.diagnosis,
+        user_id=assessment.user_id
     )
 
 @AssessmentRouter.get("", response_model=list[PatientAssessment])

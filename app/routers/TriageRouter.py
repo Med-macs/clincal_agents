@@ -53,10 +53,12 @@ def triage_endpoint(data: TriageRequest, session: SupabaseDep):
         logger.info(f"Triage workflow result: {result}")
         esi_level = extract_esi_level(result['esi'])
         assessment_repository = AssessmentRepository(session)
+        # Use system user (id=1) for standalone triage requests
         assessment_id = assessment_repository.create(
             notes=data.note,
             esi_level=esi_level,
-            diagnosis=result['diagnosis']
+            diagnosis=result['diagnosis'],
+            user_id=1
         )
         logger.info(f"Assessment stored successfully with ID: {assessment_id}")
     except Exception as e:
@@ -107,7 +109,8 @@ def chat_to_triage(data: ChatRequest, session: SupabaseDep):
             assessment_id = assessment_repository.create(
                 notes=combined_note,
                 esi_level=esi_level,
-                diagnosis=triage_result['diagnosis']
+                diagnosis=triage_result['diagnosis'],
+                user_id=data.patient_id
             )
             logger.info(f"Chat assessment stored successfully with ID: {assessment_id}")
             return ChatResponse(
