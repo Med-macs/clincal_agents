@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from app.models import TriageRequest, TriageResponse, ChatRequest, ChatResponse
 from app.engine import SupabaseDep
-from agents.triageagent import run_triage_workflow
+from agents.triageagent import run_triage_workflow, generate_patient_friendly_summary
 from agents.nursebot import NURSEBOT_SYSINT, WELCOME_MSG, llm_with_tools
 from app.repository.AssessmentRepository import AssessmentRepository
 import re
@@ -40,6 +40,8 @@ def extract_esi_level(esi_str: str) -> int:
     except Exception as e:
         logger.error(f"Error extracting ESI level from '{esi_str}': {e}")
         return 3
+
+
 
 
 @TriageRouter.post("/", response_model=TriageResponse)
@@ -104,24 +106,24 @@ def chat_to_triage(data: ChatRequest, session: SupabaseDep):
         triage_result = run_triage_workflow(combined_note)
         logger.info(f"Full triage result: {triage_result}")
         try:
-            esi_level = extract_esi_level(triage_result['esi'])
+            esi_level = int(triage_result['final_esi_level'])
             assessment_repository = AssessmentRepository(session)
             assessment_id = assessment_repository.create(
                 notes=combined_note,
                 esi_level=esi_level,
-                diagnosis=triage_result['diagnosis'],
+                diagnosis="NURSE REASONING: " + triage_result['nurse_reasoning'] + "\nDOCTOR INPUT: " + triage_result['doctor_input'],
                 user_id=data.patient_id
             )
             logger.info(f"Chat assessment stored successfully with ID: {assessment_id}")
             return ChatResponse(
-                response=f"Triage Assessment Complete!\nESI Level: {esi_level}\nDiagnosis: {triage_result['diagnosis']}\nAssessment ID: {assessment_id}",
+                response=generate_patient_friendly_summary(triage_result),
                 finished=True,
                 notes=notes
             )
         except Exception as e:
             logger.error(f"Failed to store chat assessment: {e}")
             return ChatResponse(
-                response=f"Triage Assessment Complete!\nESI Level: {triage_result['esi']}\nDiagnosis: {triage_result['diagnosis']}\nNote: Failed to store assessment",
+                response=generate_patient_friendly_summary(triage_result),
                 finished=True,
                 notes=notes
             )
