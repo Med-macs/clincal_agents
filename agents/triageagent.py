@@ -3,9 +3,17 @@ from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, END
+import os
 
-# Use Gemini model
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
+def get_llm():
+    """Get LLM instance with API key loaded from environment"""
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("GOOGLE_API_KEY not found in environment variables")
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.0-flash",
+        google_api_key=api_key
+    )
 
 # Define prompt templates
 nurse_prompt = ChatPromptTemplate.from_template(
@@ -17,6 +25,7 @@ doctor_prompt = ChatPromptTemplate.from_template(
 )
 
 def nurse_step(state: Dict[str, Any]) -> Dict[str, Any]:
+    llm = get_llm()  # Get LLM instance here
     inputs = {
         "note": state["note"],
         "doctor_msg": state.get("doctor_msg", "")
@@ -25,6 +34,7 @@ def nurse_step(state: Dict[str, Any]) -> Dict[str, Any]:
     return {**state, "nurse_msg": response.content}
 
 def doctor_step(state: Dict[str, Any]) -> Dict[str, Any]:
+    llm = get_llm()  # Get LLM instance here
     inputs = {
         "note": state["note"],
         "nurse_msg": state["nurse_msg"]
@@ -50,6 +60,12 @@ workflow.add_conditional_edges(
 app = workflow.compile()
 
 def run_triage_workflow(note: str) -> dict:
+    """Run the triage workflow with the provided patient note."""
+    
+    # Debugging: Print the API key to ensure it's loaded
+    api_key = os.getenv('GOOGLE_API_KEY')
+    print(f"GOOGLE_API_KEY loaded: {api_key[:10] if api_key else 'None'}...")
+    
     result = app.invoke({"note": note})
     return {
         "esi": result.get("nurse_msg", "N/A"),

@@ -6,8 +6,17 @@ from langgraph.graph.message import add_messages
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages.ai import AIMessage
 from langchain_core.tools import tool
+import os
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
+def get_llm():
+    """Get LLM instance with API key loaded from environment"""
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("GOOGLE_API_KEY not found in environment variables")
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.0-flash",
+        google_api_key=api_key
+    )
 
 # Tool for note-taking
 @tool
@@ -15,8 +24,11 @@ def take_note(text: str) -> str:
     """Add this symptom description to your notes if it seems medically relevant."""
     return text
 
-
-llm_with_tools = llm.bind_tools([take_note])
+# Create llm_with_tools when needed
+def get_llm_with_tools():
+    """Get LLM with tools bound"""
+    llm = get_llm()
+    return llm.bind_tools([take_note])
 
 class SymptomState(TypedDict):
     messages: Annotated[list, add_messages]  # Stores conversation history
@@ -47,6 +59,8 @@ def human_node(state: SymptomState) -> SymptomState:
     }
 
 def chatbot_node(state: SymptomState) -> SymptomState:
+    llm_with_tools = get_llm_with_tools()  # Get LLM instance here
+    
     if state["messages"]:
         response = llm_with_tools.invoke([NURSEBOT_SYSINT] + state["messages"])
     else:
@@ -70,26 +84,24 @@ def chatbot_node(state: SymptomState) -> SymptomState:
     }
 
 def handle_chat(messages: list[str]) -> str:
+    llm_with_tools = get_llm_with_tools()  # Get LLM instance here
     history = [("system", NURSEBOT_SYSINT)] + [("user", msg) for msg in messages]
     response = llm_with_tools.invoke(history)
     return response.content
+
+# Export llm_with_tools as a function for backward compatibility
+def llm_with_tools():
+    return get_llm_with_tools()
 
 graph_builder = StateGraph(SymptomState)
 graph_builder.add_node("human", human_node)
 graph_builder.add_node("chatbot", chatbot_node)
 graph_builder.add_edge(START, "chatbot")
-# graph_builder.add_edge("chatbot", "human")
 graph_builder.add_edge("human", "chatbot")
-
-
-# def maybe_exit_human_node(state: SymptomState):
-#     return END if state.get("finished", False) else "chatbot"
 
 def maybe_exit_chatbot_node(state: SymptomState):
     return END if state.get("finished", False) else "human"
 
-
-# graph_builder.add_conditional_edges("human", maybe_exit_human_node)
 graph_builder.add_conditional_edges("chatbot", maybe_exit_chatbot_node)
 
 chat_with_human_graph = graph_builder.compile()

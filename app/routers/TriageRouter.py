@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from app.models import TriageRequest, TriageResponse, ChatRequest, ChatResponse
 from app.engine import SupabaseDep
 from agents.triageagent import run_triage_workflow
-from agents.nursebot import NURSEBOT_SYSINT, WELCOME_MSG, llm_with_tools
+from agents.nursebot import NURSEBOT_SYSINT, WELCOME_MSG, get_llm_with_tools
 from app.repository.AssessmentRepository import AssessmentRepository
 import re
 from app.logging import logger
@@ -84,6 +84,7 @@ def chat_to_triage(data: ChatRequest, session: SupabaseDep):
             messages.append(HumanMessage(content=msg["content"]))
         elif msg["role"] == "assistant":
             messages.append(AIMessage(content=msg["content"]))
+    llm_with_tools = get_llm_with_tools()  # Get LLM instance here
     response = llm_with_tools.invoke(messages)
     notes = []
     finished = False
