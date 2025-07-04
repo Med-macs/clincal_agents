@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from app.models import TriageRequest, TriageResponse, ChatRequest, ChatResponse
 from app.engine import SupabaseDep
 from agents.triageagent import run_triage_workflow, generate_patient_friendly_summary
-from agents.nursebot import NURSEBOT_SYSINT, WELCOME_MSG, llm_with_tools
+from agents.nursebot import NURSEBOT_SYSINT, WELCOME_MSG, llm_with_tools, get_llm_with_tools
 from app.repository.AssessmentRepository import AssessmentRepository
 import re
 from app.logging import logger
